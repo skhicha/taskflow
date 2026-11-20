@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: taskflow
+      POSTGRES_PASSWORD: taskflow
+      POSTGRES_DB: taskflow
+    volumes:
+      - taskflow_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskflow -d taskflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg2://taskflow:taskflow@db:5432/taskflow
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-secret-in-production}
+      ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+      CORS_ORIGINS: '["http://localhost:5173","http://localhost:8080"]'
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8010:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  taskflow_db_data:
